@@ -32,6 +32,9 @@ export interface MapViewProps {
   onTilePing?: (x: number, y: number) => void
   brush?: 'reveal' | 'hide' | null
   onTilePaint?: (x: number, y: number) => void
+  /** Cases de bâtiments où l'on peut entrer : "x,y" -> nom de l'intérieur */
+  doors?: Record<string, string>
+  onEnter?: (x: number, y: number) => void
 }
 
 // ---------- Décors : chaque type est une liste de pièces géométriques ----------
@@ -118,6 +121,63 @@ const PROPS: Record<PropKind, Part[]> = {
     { geo: G.dode, color: '#77756f', pos: [0.25, 0.2, 0.25], scale: [0.45, 0.4, 0.45] },
   ],
   stone: [{ geo: G.dode, color: '#efeee8', pos: [0, 0.14, 0], scale: [0.45, 0.3, 0.4] }],
+  oven: [
+    { geo: G.box, color: '#8a4b32', pos: [0, 0.3, 0], scale: [0.95, 0.6, 0.95] },
+    { geo: G.sph, color: '#9c5638', pos: [0, 0.6, 0], scale: [0.9, 0.6, 0.9] },
+    { geo: G.box, color: '#ff8a1f', pos: [0, 0.3, 0.46], scale: [0.4, 0.3, 0.06], emissive: true },
+  ],
+  shelf: [
+    { geo: G.box, color: '#6b4a2b', pos: [0, 0.55, -0.3], scale: [0.95, 1.1, 0.3] },
+    { geo: G.box, color: '#c9a86b', pos: [0, 0.4, -0.2], scale: [0.8, 0.14, 0.2] },
+    { geo: G.box, color: '#7aa0c4', pos: [0.15, 0.78, -0.2], scale: [0.5, 0.16, 0.2] },
+  ],
+  counter: [
+    { geo: G.box, color: '#7a5532', pos: [0, 0.32, 0], scale: [1, 0.64, 0.6] },
+    { geo: G.box, color: '#a07447', pos: [0, 0.66, 0], scale: [1.02, 0.06, 0.66] },
+  ],
+  anvil: [
+    { geo: G.box, color: '#6b4a2b', pos: [0, 0.18, 0], scale: [0.35, 0.36, 0.35] },
+    { geo: G.box, color: '#3c3f44', pos: [0, 0.45, 0], scale: [0.7, 0.18, 0.32] },
+  ],
+  barrel: [
+    { geo: G.cyl, color: '#7a5532', pos: [-0.2, 0.3, -0.15], scale: [0.45, 0.6, 0.45] },
+    { geo: G.cyl, color: '#6b4a2b', pos: [0.22, 0.3, 0.18], scale: [0.45, 0.6, 0.45] },
+  ],
+  bookcase: [
+    { geo: G.box, color: '#5a3b22', pos: [0, 0.6, -0.3], scale: [0.95, 1.2, 0.3] },
+    { geo: G.box, color: '#8e2f3b', pos: [-0.2, 0.45, -0.18], scale: [0.4, 0.2, 0.12] },
+    { geo: G.box, color: '#2f5d8e', pos: [0.2, 0.75, -0.18], scale: [0.45, 0.2, 0.12] },
+    { geo: G.box, color: '#3f7a3a', pos: [-0.1, 1.0, -0.18], scale: [0.6, 0.18, 0.12] },
+  ],
+  workbench: [
+    { geo: G.box, color: '#a07447', pos: [0, 0.4, 0], scale: [0.95, 0.1, 0.55] },
+    { geo: G.box, color: '#6b4a2b', pos: [-0.35, 0.2, 0], scale: [0.1, 0.4, 0.5] },
+    { geo: G.box, color: '#6b4a2b', pos: [0.35, 0.2, 0], scale: [0.1, 0.4, 0.5] },
+    { geo: G.box, color: '#d8b77a', pos: [0.1, 0.5, 0], scale: [0.6, 0.06, 0.12] },
+  ],
+  fireplace: [
+    { geo: G.box, color: '#7c776f', pos: [0, 0.55, -0.25], scale: [1, 1.1, 0.5] },
+    { geo: G.box, color: '#1d1a18', pos: [0, 0.3, 0.01], scale: [0.55, 0.45, 0.06] },
+    { geo: G.cone, color: '#ff8a1f', pos: [0, 0.25, 0.05], scale: [0.3, 0.35, 0.2], emissive: true },
+  ],
+  chest: [
+    { geo: G.box, color: '#7a4b22', pos: [0, 0.2, 0], scale: [0.7, 0.4, 0.45] },
+    { geo: G.box, color: '#c9a227', pos: [0, 0.4, 0], scale: [0.72, 0.05, 0.47] },
+  ],
+  sacks: [
+    { geo: G.sph, color: '#e8dfc8', pos: [-0.2, 0.25, 0], scale: [0.45, 0.5, 0.4] },
+    { geo: G.sph, color: '#ddd3b8', pos: [0.22, 0.22, 0.15], scale: [0.4, 0.45, 0.38] },
+  ],
+  bread: [
+    { geo: G.box, color: '#7a5532', pos: [0, 0.3, 0], scale: [0.9, 0.08, 0.7] },
+    { geo: G.box, color: '#6b4a2b', pos: [0, 0.15, 0], scale: [0.8, 0.3, 0.6] },
+    { geo: G.sph, color: '#c98a3e', pos: [-0.2, 0.4, 0], scale: [0.35, 0.18, 0.22] },
+    { geo: G.sph, color: '#d49a4a', pos: [0.2, 0.4, 0.1], scale: [0.3, 0.16, 0.3] },
+  ],
+  chair: [
+    { geo: G.box, color: '#7a5532', pos: [0, 0.22, 0], scale: [0.4, 0.06, 0.4] },
+    { geo: G.box, color: '#7a5532', pos: [0, 0.4, -0.18], scale: [0.4, 0.4, 0.06] },
+  ],
 }
 
 const tmpObj = new THREE.Object3D()
@@ -438,6 +498,7 @@ function Scene(props: MapViewProps & { resetSignal: number }) {
         onPointerMove={(e) => {
           const t = tileFrom(e.point)
           setHover(t)
+          if (!drag && !painting.current) document.body.style.cursor = t && props.onEnter && props.doors?.[t.join(',')] ? 'pointer' : ''
           if (drag && t && (t[0] !== drag.x || t[1] !== drag.y)) setDrag({ ...drag, x: t[0], y: t[1] })
           if (painting.current && t && props.onTilePaint) {
             const k = t.join(',')
@@ -454,7 +515,9 @@ function Scene(props: MapViewProps & { resetSignal: number }) {
         onClick={(e) => {
           if (e.delta > 5 || props.brush) return
           const t = tileFrom(e.point)
-          if (t) props.onTileClick?.(t[0], t[1], { shift: e.nativeEvent.shiftKey, alt: e.nativeEvent.altKey })
+          if (!t) return
+          if (props.onEnter && props.doors?.[t.join(',')]) return props.onEnter(t[0], t[1])
+          props.onTileClick?.(t[0], t[1], { shift: e.nativeEvent.shiftKey, alt: e.nativeEvent.altKey })
         }}
         onDoubleClick={(e) => {
           const t = tileFrom(e.point)
@@ -475,6 +538,12 @@ function Scene(props: MapViewProps & { resetSignal: number }) {
             depthWrite={false}
           />
         </mesh>
+      )}
+
+      {hover && !props.brush && props.onEnter && props.doors?.[hover.join(',')] && (
+        <Html position={[hover[0] + ox, 2.2, hover[1] + oz]} center zIndexRange={[30, 0]} style={{ pointerEvents: 'none' }}>
+          <div className="door-tip">🚪 Entrer : {props.doors[hover.join(',')]}</div>
+        </Html>
       )}
 
       {tokens.map((t) => {

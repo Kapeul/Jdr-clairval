@@ -55,3 +55,27 @@ describe('vue joueurs', () => {
     expect(g.players.b.characterId).toBeUndefined()
   })
 })
+
+describe('intérieurs', () => {
+  it("un joueur peut demander à entrer dans un bâtiment visible, et le MJ l'y emmène", async () => {
+    const { goToMap } = await import('../state')
+    let g = newGame(scenario, 'TEST')
+    g = applyPlayerAction(g, scenario, 'a', { t: 'hello', key: 'a', name: 'Alice', characterId: 'pc-brune' })!
+    // cabane cachée : refusé
+    expect(applyPlayerAction(g, scenario, 'a', { t: 'enter', x: 6, y: 15 })).toBeNull()
+    g.maps['demo-bois'].revealedZones.push('c')
+    const v = buildPlayerView(g, scenario)
+    expect(v.map!.doors['6,15']).toBe("La cabane d'Odile")
+    expect(v.map!.doors['9,13']).toBeUndefined() // le puits n'est pas une porte
+    g = applyPlayerAction(g, scenario, 'a', { t: 'enter', x: 6, y: 15 })!
+    expect(g.requests).toHaveLength(1)
+    goToMap(g, scenario, 'demo-cabane')
+    expect(g.activeMapId).toBe('demo-cabane')
+    expect(g.requests).toHaveLength(0)
+    expect(g.tokens.some((t) => t.mapId === 'demo-cabane' && t.characterId === 'pc-brune')).toBe(true)
+    expect(g.tokens.some((t) => t.mapId === 'demo-cabane' && t.kind === 'npc' && t.name === 'Odile')).toBe(true)
+    goToMap(g, scenario, 'demo-bois')
+    const brune = g.tokens.find((t) => t.mapId === 'demo-bois' && t.characterId === 'pc-brune')!
+    expect(Math.abs(brune.x - 6) + Math.abs(brune.y - 14)).toBeLessThanOrEqual(2)
+  })
+})

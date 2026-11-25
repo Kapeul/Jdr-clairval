@@ -10,7 +10,7 @@ import type {
   DiceRoll,
 } from '../types'
 import { roll, isValidExpr } from './dice'
-import { VOID } from './terrain'
+import { TERRAIN, VOID } from './terrain'
 
 export const VIEW_VERSION = 1
 const MAX_JOURNAL = 400
@@ -42,7 +42,7 @@ export function newGame(scenario: Scenario, room: string): GameState {
     characters[c.id] = { hp: c.hpLevel1, hpMax: c.hpLevel1, level: 1, notes: '' }
   }
   const firstMap = scenario.parts[0]?.mapIds[0] ?? scenario.maps[0]?.id ?? null
-  return {
+  const g: GameState = {
     room,
     scenarioId: scenario.id,
     scenarioTitle: scenario.title,
@@ -64,6 +64,91 @@ export function newGame(scenario: Scenario, room: string): GameState {
     players: {},
     characters,
     pings: [],
+    requests: [],
+    seeded: [],
+  }
+  seedNpcs(g, scenario)
+  return g
+}
+
+/** Pose les PNJ prévus par le scénario dans les cartes (une seule fois par carte). */
+export function seedNpcs(g: GameState, scenario: Scenario) {
+  g.seeded ??= []
+  for (const m of scenario.maps) {
+    if (!m.npcs?.length || g.seeded.includes(m.id)) continue
+    g.seeded.push(m.id)
+    for (const n of m.npcs) {
+      const def = scenario.npcs.find((d) => d.id === n.npcId)
+      const name = def?.name ?? n.npcId
+      g.tokens.push({
+        id: uid('t'),
+        mapId: m.id,
+        x: n.x,
+        y: n.y,
+        kind: 'npc',
+        name,
+        label: n.label ?? name.replace(/^(Monsieur|Le|La|L')\s*/i, '').split(/[ ,]/)[0],
+        color: '#d4a017',
+        visible: true,
+      })
+    }
+  }
+}
+
+/** Carte intérieure → zone de la carte extérieure qui y mène */
+export function doorOf(scenario: Scenario, interiorId: string): { map: MapDef; zone: string } | null {
+  for (const m of scenario.maps)
+    for (const [z, info] of Object.entries(m.zoneInfo)) if (info.enterMapId === interiorId) return { map: m, zone: z }
+  return null
+}
+
+/** Déplace les pions des personnages joués vers une carte (près d'une case donnée ou du départ). */
+export function movePartyTo(g: GameState, scenario: Scenario, mapId: string, at?: [number, number]) {
+  const map = scenario.maps.find((m) => m.id === mapId)
+  if (!map) return
+  const ids = Object.values(g.players)
+    .map((p) => p.characterId)
+    .filter(Boolean) as string[]
+  const [sx, sy] = at ?? map.start ?? [Math.floor(map.width / 2), Math.floor(map.height / 2)]
+  for (const id of ids) {
+    let t = g.tokens.find((t) => t.kind === 'pc' && t.characterId === id && t.mapId === mapId)
+    if (!t) {
+      placePc(g, scenario, id, mapId)
+      t = g.tokens.find((t) => t.kind === 'pc' && t.characterId === id && t.mapId === mapId)
+    }
+    if (!t) continue
+    t.x = -99
+    const [x, y] = freeSpotNear(g, map, sx, sy)
+    t.x = x
+    t.y = y
+  }
+}
+
+/** Fait entrer (ou sortir) le groupe : change la carte des joueurs, révèle le lieu lié à la porte. */
+export function goToMap(g: GameState, scenario: Scenario, mapId: string) {
+  const map = scenario.maps.find((m) => m.id === mapId)
+  if (!map) return
+  const from = scenario.maps.find((m) => m.id === g.activeMapId)
+  g.activeMapId = mapId
+  g.requests = (g.requests ?? []).filter((r) => r.mapId !== mapId)
+  // sortie d'un intérieur : on réapparaît devant la porte
+  if (from?.exitTo && from.exitTo.mapId === mapId) {
+    movePartyTo(g, scenario, mapId, [from.exitTo.x, from.exitTo.y])
+    addJournal(g, { author: 'Table', kind: 'system', text: `Le groupe sort : **${map.name}**` })
+    return
+  }
+  movePartyTo(g, scenario, mapId)
+  const door = doorOf(scenario, mapId)
+  if (door) {
+    const locId = door.map.zoneInfo[door.zone].locationId
+    const loc = scenario.locations.find((l) => l.id === locId)
+    if (loc && !g.revealed.locations.includes(loc.id)) {
+      g.revealed.locations.push(loc.id)
+    }
+    if (!g.maps[door.map.id].revealedZones.includes(door.zone)) g.maps[door.map.id].revealedZones.push(door.zone)
+    addJournal(g, { author: 'Table', kind: 'system', text: `Le groupe entre : **${map.name}**` })
+  } else {
+    addJournal(g, { author: 'Table', kind: 'system', text: `Nouvelle carte : **${map.name}**` })
   }
 }
 
@@ -74,6 +159,8 @@ export function reconcile(game: GameState, scenario: Scenario): GameState {
   for (const c of scenario.characters)
     if (!g.characters[c.id]) g.characters[c.id] = { hp: c.hpLevel1, hpMax: c.hpLevel1, level: 1, notes: '' }
   if (g.activeMapId && !scenario.maps.some((m) => m.id === g.activeMapId)) g.activeMapId = scenario.maps[0]?.id ?? null
+  g.requests ??= []
+  seedNpcs(g, scenario)
   return g
 }
 
@@ -136,7 +223,15 @@ export function buildPlayerView(game: GameState, scenario: Scenario): PlayerView
     const labels = Object.entries(map.zoneInfo)
       .filter(([z, info]) => !info.nolabel && ms?.revealedZones.includes(z) && cents[z])
       .map(([z, info]) => ({ text: info.publicName ?? info.name, x: cents[z].x, y: cents[z].y }))
-    mapView = { id: map.id, name: map.name, width: map.width, height: map.height, ambient: map.ambient, terrain, labels }
+    const doors: Record<string, string> = {}
+    for (let y = 0; y < map.height; y++)
+      for (let x = 0; x < map.width; x++) {
+        const target = map.zoneInfo[zoneAt(map, x, y)]?.enterMapId
+        const ch = map.terrain[y][x]
+        if (target && mask[y][x] && (TERRAIN[ch]?.block || ch === '+')) doors[`${x},${y}`] = scenario.maps.find((m) => m.id === target)?.name ?? 'Entrer'
+      }
+    const exitName = map.exitTo ? scenario.maps.find((m) => m.id === map.exitTo!.mapId)?.name : undefined
+    mapView = { id: map.id, name: map.name, width: map.width, height: map.height, ambient: map.ambient, terrain, labels, doors, exitName }
   }
   const tokens = map
     ? game.tokens.filter((t) => t.mapId === map.id && t.visible && tokenOnRevealedTile(scenario, game, t))
@@ -269,6 +364,31 @@ export function applyPlayerAction(game: GameState, scenario: Scenario, key: stri
       syncTokenHp(g)
       return g
     }
+    case 'enter':
+    case 'exit': {
+      if (!p || !g.activeMapId) return null
+      const map = scenario.maps.find((m) => m.id === g.activeMapId)
+      if (!map) return null
+      let target: string | undefined
+      if (a.t === 'enter') {
+        const x = Math.round(a.x)
+        const y = Math.round(a.y)
+        if (!isTileRevealed(map, g.maps[map.id], x, y)) return null
+        target = map.zoneInfo[zoneAt(map, x, y)]?.enterMapId
+      } else target = map.exitTo?.mapId
+      const tm = scenario.maps.find((m) => m.id === target)
+      if (!tm) return null
+      g.requests ??= []
+      const who = charName(scenario, p.characterId) ?? p.name
+      if (g.requests.some((r) => r.mapId === tm.id && r.player === who)) return null
+      g.requests.push({ id: uid('q'), ts: Date.now(), player: who, mapId: tm.id, mapName: tm.name })
+      addJournal(g, {
+        author: 'Table',
+        kind: 'system',
+        text: `${who} veut ${a.t === 'enter' ? 'entrer' : 'aller'} : **${tm.name}**`,
+      })
+      return g
+    }
     case 'charNotes': {
       if (!p || p.characterId !== a.characterId) return null
       const cs = g.characters[a.characterId]
@@ -340,7 +460,8 @@ export function freeSpotNear(g: GameState, map: MapDef, x: number, y: number): [
         if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue
         if (occupied.has(`${nx},${ny}`)) continue
         const c = map.terrain[ny][nx]
-        if ('#HGK|TY^~mxwbcfAkrSh '.includes(c)) continue
+        const td = TERRAIN[c]
+        if (!td || !td.walkable) continue
         return [nx, ny]
       }
   return [x, y]

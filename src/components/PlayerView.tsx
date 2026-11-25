@@ -43,6 +43,11 @@ function PlayerTable({ room, me, onRename }: { room: string; me: { key: string; 
   const [tab, setTab] = useState<Tab>('journal')
   const [seenJournal, setSeenJournal] = useState(0)
   const pings = useLocalPings(view?.pings ?? [])
+  const [toast, setToast] = useState<string | null>(null)
+  const flash = (t: string) => {
+    setToast(t)
+    setTimeout(() => setToast(null), 2500)
+  }
 
   const mine = view?.party.find((p) => p.playerKey === me.key)
   const myChar = mine?.character
@@ -117,8 +122,20 @@ function PlayerTable({ room, me, onRename }: { room: string; me: { key: string; 
           <>
             <div className="map-bar">
               <b>🗺 {map.name}</b>
-              <span className="muted small">Fais glisser ton pion pour te déplacer · double-clic pour signaler un endroit</span>
+              {map.exitName && (
+                <button
+                  className="small"
+                  onClick={() => {
+                    send({ t: 'exit' })
+                    flash('Demande envoyée au MJ')
+                  }}
+                >
+                  ⬅ Sortir : {map.exitName}
+                </button>
+              )}
+              <span className="muted small">Glisse ton pion pour te déplacer · clic sur un bâtiment pour y entrer · double-clic pour signaler un endroit</span>
             </div>
+            {toast && <div className="toast">{toast}</div>}
             <MapView
               mapKey={map.id}
               width={map.width}
@@ -133,6 +150,11 @@ function PlayerTable({ room, me, onRename }: { room: string; me: { key: string; 
                 if (map.terrain[y]?.[x] && map.terrain[y][x] !== ' ') send({ t: 'move', tokenId: id, x, y })
               }}
               onTilePing={(x, y) => send({ t: 'ping', x, y })}
+              doors={map.doors}
+              onEnter={(x, y) => {
+                send({ t: 'enter', x, y })
+                flash(`Demande envoyée au MJ : ${map.doors[`${x},${y}`]}`)
+              }}
             />
           </>
         ) : (

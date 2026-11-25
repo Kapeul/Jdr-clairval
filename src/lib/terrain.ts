@@ -22,6 +22,18 @@ export type PropKind =
   | 'post'
   | 'rock'
   | 'stone'
+  | 'oven'
+  | 'shelf'
+  | 'counter'
+  | 'anvil'
+  | 'barrel'
+  | 'bookcase'
+  | 'workbench'
+  | 'fireplace'
+  | 'chest'
+  | 'sacks'
+  | 'bread'
+  | 'chair'
 
 export interface TerrainDef {
   name: string
@@ -68,6 +80,22 @@ export const TERRAIN: Record<string, TerrainDef> = {
   S: { name: 'Statue', ground: '#a19c90', h: 0.22, prop: 'statue', walkable: false },
   h: { name: 'Foin', ground: '#8f6b43', h: 0.24, prop: 'hay', walkable: false },
   n: { name: 'Pierre blanche', ground: '#4d7638', h: 0.2, prop: 'stone', walkable: true },
+  // ----- intérieurs -----
+  I: { name: 'Mur intérieur', ground: '#6e5a45', h: 0.24, block: { color: '#d8c8a8', h: 0.65, top: '#7a5a3c' }, walkable: false },
+  J: { name: 'Mur de pierre bas', ground: '#6e6a64', h: 0.24, block: { color: '#8d877d', h: 0.65, top: '#6c665e' }, walkable: false },
+  R: { name: 'Tapis', ground: '#8e2f3b', h: 0.25, walkable: true },
+  O: { name: 'Four à pain', ground: '#86827b', h: 0.24, prop: 'oven', walkable: false },
+  E: { name: 'Étagère', ground: '#8f6b43', h: 0.24, prop: 'shelf', walkable: false },
+  C: { name: 'Comptoir', ground: '#8f6b43', h: 0.24, prop: 'counter', walkable: false },
+  a: { name: 'Enclume', ground: '#6e6a64', h: 0.24, prop: 'anvil', walkable: false },
+  B: { name: 'Tonneaux', ground: '#8f6b43', h: 0.24, prop: 'barrel', walkable: false },
+  L: { name: 'Bibliothèque', ground: '#8f6b43', h: 0.24, prop: 'bookcase', walkable: false },
+  W: { name: 'Établi', ground: '#8f6b43', h: 0.24, prop: 'workbench', walkable: false },
+  F: { name: 'Cheminée', ground: '#86827b', h: 0.24, prop: 'fireplace', walkable: false },
+  X: { name: 'Coffre', ground: '#8f6b43', h: 0.24, prop: 'chest', walkable: false },
+  Q: { name: 'Sacs de farine', ground: '#8f6b43', h: 0.24, prop: 'sacks', walkable: false },
+  M: { name: 'Pains', ground: '#8f6b43', h: 0.24, prop: 'bread', walkable: false },
+  Z: { name: 'Chaise', ground: '#8f6b43', h: 0.24, prop: 'chair', walkable: true },
 }
 
 export const VOID = ' '

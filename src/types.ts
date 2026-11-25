@@ -17,6 +17,8 @@ export interface MapZone {
   publicName?: string
   /** Pas d'étiquette sur la carte (grandes zones de fond) */
   nolabel?: boolean
+  /** Bâtiment : carte intérieure ouverte d'un clic sur la zone */
+  enterMapId?: string
 }
 
 export interface MapDef {
@@ -35,6 +37,10 @@ export interface MapDef {
   startZones?: string[]
   /** Case de départ des personnages */
   start?: [number, number]
+  /** Intérieur : carte et case où l'on ressort */
+  exitTo?: { mapId: string; x: number; y: number }
+  /** PNJ présents dès l'ouverture de la carte */
+  npcs?: { npcId: string; x: number; y: number; label?: string }[]
 }
 
 export interface LocationDef {
@@ -225,6 +231,10 @@ export interface GameState {
   players: Record<string, PlayerInfo>
   characters: Record<string, CharacterState>
   pings: Ping[]
+  /** Demandes d'entrée dans un bâtiment faites par les joueurs */
+  requests?: { id: string; ts: number; player: string; mapId: string; mapName: string }[]
+  /** Cartes dont les PNJ ont déjà été posés */
+  seeded?: string[]
 }
 
 // ---------- Vue joueurs (seule chose envoyée sur le réseau) ----------
@@ -238,6 +248,9 @@ export interface PlayerMapView {
   /** Cases non révélées remplacées par ' ' */
   terrain: string[]
   labels: { text: string; x: number; y: number }[]
+  /** Cases de bâtiments où l'on peut entrer : "x,y" -> nom de l'intérieur */
+  doors: Record<string, string>
+  exitName?: string
 }
 
 export interface PlayerView {
@@ -271,3 +284,5 @@ export type PlayerAction =
   | { t: 'hp'; characterId: string; hp: number }
   | { t: 'charNotes'; characterId: string; notes: string }
   | { t: 'pick'; characterId: string | null }
+  | { t: 'enter'; x: number; y: number }
+  | { t: 'exit' }

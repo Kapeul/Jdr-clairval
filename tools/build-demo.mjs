@@ -8,7 +8,7 @@ b.scatter(0, 0, 30, 22, 'Y', 0.35, 3, ',')
 b.path([[0, 11], [9, 11], [15, 8], [22, 8]], '=', 2, 'r')
 b.name('r', 'Le vieux chemin')
 // clairière + puits
-b.disc(9, 13, 4, '.', 'c').set(9, 13, 'w', 'c').name('c', 'La clairière')
+b.disc(9, 13, 4, '.', 'c').set(9, 13, 'w', 'c').name('c', 'La clairière', { enterMapId: 'demo-cabane' })
 b.house(5, 15, 3, 2, 'c', 'N')
 // tour en ruine
 b.room(20, 3, 7, 7, '-', 't').set(23, 9, '+', 't').set(21, 4, 's', 't').set(25, 7, 'k', 't').name('t', 'La tour du Corbeau')
@@ -18,6 +18,15 @@ b.disc(4, 4, 3, '~', 'm').name('m', 'La mare noire')
 b.claim(0, 0, 30, 22, 'f', 'f')
 b.name('f', 'Les bois')
 const map = b.build({ id: 'demo-bois', name: 'Les bois du Corbeau', partId: 'p1', startZones: ['r'], start: [2, 11] })
+
+// intérieur de la cabane (clic sur la cabane pour y entrer)
+const c = new MapBuilder(9, 7, ' ', 'i')
+c.room(0, 0, 9, 7, '_', 'i', 'I').set(4, 6, '+', 'i')
+c.set(1, 1, 'b').set(7, 1, 'F').rect(3, 3, 2, 1, 'r').set(2, 3, 'Z').set(1, 5, 'X').set(7, 5, 'E').set(5, 1, 'O')
+c.name('i', "La cabane d'Odile", { nolabel: true })
+const cabane = c.build({ id: 'demo-cabane', name: "La cabane d'Odile", partId: 'p1', ambient: 'dusk', startZones: ['i'], start: [4, 5] })
+cabane.exitTo = { mapId: 'demo-bois', x: 6, y: 14 }
+cabane.npcs = [{ npcId: 'n-odile', x: 4, y: 2 }]
 
 const scenario = {
   format: 'jdr25d-scenario',
@@ -34,10 +43,10 @@ const scenario = {
       intro: "La meunière vous a confié une mission simple : retrouver la clef de son moulin, volée ce matin par un corbeau… qui l'a insultée avant de s'envoler vers les bois.",
       gmNotes:
         "## Déroulé\n\n- Les héros suivent le vieux chemin.\n- Dans la clairière, une ermite indique la tour.\n- Dans la tour, le corbeau garde la clef ; il négocie (une pomme suffit) ou appelle deux rats géants.\n\n## Astuce\n\nRévèle la clairière quand les joueurs avancent, puis la tour. Pose les rats en pions cachés et rends-les visibles au moment du combat.",
-      mapIds: ['demo-bois'],
+      mapIds: ['demo-bois', 'demo-cabane'],
     },
   ],
-  maps: [map],
+  maps: [map, cabane],
   locations: [
     { id: 'l-chemin', partId: 'p1', mapId: 'demo-bois', zone: 'r', num: '1', name: 'Le vieux chemin', publicText: 'Un chemin envahi de racines qui s’enfonce dans les bois.', gmNotes: 'Rien de dangereux ici.' },
     { id: 'l-clairiere', partId: 'p1', mapId: 'demo-bois', zone: 'c', num: '2', name: 'La clairière', publicText: 'Une clairière avec un puits et une petite cabane.', readAloud: "Le chemin débouche sur une clairière ensoleillée. Une vieille femme tire de l'eau d'un puits.", gmNotes: "L'ermite Odile indique la tour contre un coup de main pour remonter son seau." },

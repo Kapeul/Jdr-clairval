@@ -6,9 +6,10 @@ import MapView, { type MapLabel } from './MapView'
 import { CharacterSheet, CopyButton, DicePanel, Journal, RichText, Tabs } from './panels'
 import { readScenarioFile } from './Home'
 import { useGMSession } from '../lib/session'
-import { addJournal, addPing, addRoll, freeSpotNear, placePc, reconcile, revealedMask, syncTokenHp, uid, zoneAt, zoneCentroids } from '../lib/state'
+import { addJournal, addPing, addRoll, freeSpotNear, goToMap, placePc, reconcile, revealedMask, syncTokenHp, uid, zoneAt, zoneCentroids } from '../lib/state'
 import { loadGame, loadScenario, saveScenario } from '../lib/storage'
 import { modStr } from '../lib/dice'
+import { TERRAIN } from '../lib/terrain'
 
 export default function GMView({ room }: { room: string }) {
   const [, refresh] = useState(0)
@@ -171,12 +172,22 @@ function GMTable({ initial, scenario }: { initial: GameState; scenario: Scenario
       g.tokens.push({ id: uid('t'), mapId: map.id, x, y, kind: 'npc', name: n.name, label: n.name.split(/[ ,]/)[0], color: '#d4a017', visible: true })
     })
 
-  const showToPlayers = () =>
-    update((g) => {
-      g.activeMapId = map.id
-      for (const p of Object.values(g.players)) if (p.characterId) placePc(g, scenario, p.characterId, map.id)
-      addJournal(g, { author: 'Table', kind: 'system', text: `Nouvelle carte : **${map.name}**` })
-    })
+  const showToPlayers = (mapId = map.id) => {
+    update((g) => goToMap(g, scenario, mapId))
+    setViewMapId(mapId)
+  }
+  const doors = useMemo(() => {
+    const d: Record<string, string> = {}
+    for (let y = 0; y < map.height; y++)
+      for (let x = 0; x < map.width; x++) {
+        const t = map.zoneInfo[zoneAt(map, x, y)]?.enterMapId
+        const ch = map.terrain[y][x]
+        if (t && (TERRAIN[ch]?.block || ch === '+')) d[`${x},${y}`] = scenario.maps.find((m) => m.id === t)?.name ?? t
+      }
+    return d
+  }, [map, scenario])
+  const parent = map.exitTo ? scenario.maps.find((m) => m.id === map.exitTo!.mapId) : undefined
+  const requests = game.requests ?? []
 
   const placeAllPcs = () =>
     update((g) => {
@@ -364,8 +375,13 @@ function GMTable({ initial, scenario }: { initial: GameState; scenario: Scenario
           {game.activeMapId === map.id ? (
             <span className="pill ok">👁 Les joueurs voient cette carte</span>
           ) : (
-            <button className="primary" onClick={showToPlayers}>
-              Montrer aux joueurs
+            <button className="primary" onClick={() => showToPlayers()}>
+              {parent ? 'Faire entrer les joueurs' : 'Montrer aux joueurs'}
+            </button>
+          )}
+          {parent && (
+            <button onClick={() => (game.activeMapId === map.id ? showToPlayers(parent.id) : setViewMapId(parent.id))}>
+              ⬅ {game.activeMapId === map.id ? 'Faire sortir le groupe' : 'Retour'} : {parent.name}
             </button>
           )}
           <div className="seg">
@@ -386,7 +402,31 @@ function GMTable({ initial, scenario }: { initial: GameState; scenario: Scenario
             {showLeft ? '⇤ Masquer le panneau' : '⇥ Panneau'}
           </button>
         </div>
+        {requests.length > 0 && (
+          <div className="requests">
+            {requests.map((r) => (
+              <div key={r.id} className="row">
+                <span>
+                  🚪 <b>{r.player}</b> veut aller : <b>{r.mapName}</b>
+                </span>
+                <span className="row">
+                  <button className="primary small" onClick={() => showToPlayers(r.mapId)}>
+                    Y aller avec le groupe
+                  </button>
+                  <button className="small ghost" onClick={() => update((g) => void (g.requests = (g.requests ?? []).filter((x) => x.id !== r.id)))}>
+                    Ignorer
+                  </button>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
         <MapView
+          doors={mode === 'move' ? doors : undefined}
+          onEnter={(x, y) => {
+            const t = map.zoneInfo[zoneAt(map, x, y)]?.enterMapId
+            if (t) setViewMapId(t)
+          }}
           mapKey={map.id}
           width={map.width}
           height={map.height}
@@ -421,7 +461,7 @@ function GMTable({ initial, scenario }: { initial: GameState; scenario: Scenario
           onTilePaint={(x, y) => setTileOverride(x, y, mode === 'reveal')}
         />
         <div className="map-hint muted small">
-          Glisser : déplacer la vue · clic droit : pivoter · molette : zoom · double-clic : signaler un point · les cases sombres sont invisibles pour les joueurs
+          Clic sur un bâtiment : voir l'intérieur · glisser : déplacer la vue · clic droit : pivoter · molette : zoom · double-clic : signaler un point · les cases sombres sont invisibles pour les joueurs
         </div>
       </main>
 
